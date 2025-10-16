@@ -9,6 +9,8 @@ import { Message } from '../types/agent';
 export function ChatWindow() {
   const [messageText, setMessageText] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [metadata, setMetadata] = useState<Array<{ key: string; value: string }>>([]);
+  const [showMetadata, setShowMetadata] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -56,10 +58,19 @@ export function ChatWindow() {
       // Get existing task context for this agent
       const taskContext = getTaskContext(agent.id);
 
+      // Convert metadata array to object
+      const metadataObj = metadata.reduce((acc, { key, value }) => {
+        if (key.trim()) {
+          acc[key] = value;
+        }
+        return acc;
+      }, {} as Record<string, string>);
+
       // Use streaming API
       const response = await client.sendMessageStreaming(
         messageToSend,
         taskContext,
+        Object.keys(metadataObj).length > 0 ? metadataObj : undefined,
         (streamText) => {
           // This callback is called for each streaming update
           const messageId = `msg-stream-${Date.now()}-${Math.random()}`;
@@ -204,15 +215,79 @@ export function ChatWindow() {
       </div>
 
       <div className="message-input-container">
-        <textarea
-          className="message-input"
-          value={messageText}
-          onChange={(e) => setMessageText(e.target.value)}
-          onKeyPress={handleKeyPress}
-          placeholder="Type a message..."
-          disabled={isSending}
-          rows={1}
-        />
+        <div className="input-with-metadata">
+          <div className="metadata-toggle-container">
+            <button
+              className="metadata-toggle-button"
+              onClick={() => setShowMetadata(!showMetadata)}
+              type="button"
+              title="Add metadata"
+            >
+              {showMetadata ? '📋 Hide Metadata' : '📋 Add Metadata'}
+            </button>
+          </div>
+
+          {showMetadata && (
+            <div className="metadata-container">
+              <div className="metadata-header">
+                <span>Message Metadata</span>
+                <button
+                  className="add-metadata-button"
+                  onClick={() => setMetadata([...metadata, { key: '', value: '' }])}
+                  type="button"
+                >
+                  + Add Field
+                </button>
+              </div>
+              {metadata.map((item, index) => (
+                <div key={index} className="metadata-field">
+                  <input
+                    type="text"
+                    placeholder="Key"
+                    value={item.key}
+                    onChange={(e) => {
+                      const newMetadata = [...metadata];
+                      newMetadata[index].key = e.target.value;
+                      setMetadata(newMetadata);
+                    }}
+                    className="metadata-key-input"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Value"
+                    value={item.value}
+                    onChange={(e) => {
+                      const newMetadata = [...metadata];
+                      newMetadata[index].value = e.target.value;
+                      setMetadata(newMetadata);
+                    }}
+                    className="metadata-value-input"
+                  />
+                  <button
+                    className="remove-metadata-button"
+                    onClick={() => {
+                      const newMetadata = metadata.filter((_, i) => i !== index);
+                      setMetadata(newMetadata);
+                    }}
+                    type="button"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <textarea
+            className="message-input"
+            value={messageText}
+            onChange={(e) => setMessageText(e.target.value)}
+            onKeyPress={handleKeyPress}
+            placeholder="Type a message..."
+            disabled={isSending}
+            rows={1}
+          />
+        </div>
         <button
           className="send-button"
           onClick={handleSendMessage}

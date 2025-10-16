@@ -43,6 +43,7 @@ export class A2AClient {
   async sendMessageStreaming(
     message: string,
     context?: TaskContext,
+    metadata?: Record<string, any>,
     onUpdate?: (message: string) => void
   ): Promise<{ text: string; context: TaskContext }> {
     const messageObj: any = {
@@ -68,7 +69,7 @@ export class A2AClient {
     }
 
     const requestId = this.generateId();
-    const request = {
+    const request: any = {
       jsonrpc: '2.0',
       method: 'message/stream',
       params: {
@@ -76,6 +77,11 @@ export class A2AClient {
       },
       id: requestId,
     };
+
+    // Add metadata to params if provided
+    if (metadata && Object.keys(metadata).length > 0) {
+      request.params.metadata = metadata;
+    }
 
     console.log('🔵 A2A Streaming Request:', JSON.stringify(request, null, 2));
 
@@ -220,7 +226,8 @@ export class A2AClient {
 
   async sendMessage(
     message: string,
-    context?: TaskContext
+    context?: TaskContext,
+    metadata?: Record<string, any>
   ): Promise<{ text: string; context: TaskContext; intermediateMessages?: string[] }> {
     const messageObj: any = {
       kind: 'message',
@@ -245,7 +252,7 @@ export class A2AClient {
       }
     }
 
-    const request: A2ARequest = {
+    const request: any = {
       jsonrpc: '2.0',
       method: 'message/send',
       params: {
@@ -253,6 +260,11 @@ export class A2AClient {
       },
       id: this.generateId(),
     };
+
+    // Add metadata to params if provided
+    if (metadata && Object.keys(metadata).length > 0) {
+      request.params.metadata = metadata;
+    }
 
     try {
       const data = await this.makeRequest(request);

@@ -764,3 +764,124 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #4a4a4a;
 }
+
+/* Metadata Input Styles */
+.input-with-metadata {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.metadata-toggle-container {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.metadata-toggle-button {
+  background: none;
+  border: 1px solid #3a3a3a;
+  color: #888;
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.metadata-toggle-button:hover {
+  background-color: #2a2a2a;
+  color: #e4e4e4;
+  border-color: #2563eb;
+}
+
+.metadata-container {
+  background-color: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.metadata-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.metadata-header span {
+  font-size: 12px;
+  font-weight: 500;
+  color: #aaa;
+}
+
+.add-metadata-button {
+  background-color: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 11px;
+  transition: background-color 0.2s;
+}
+
+.add-metadata-button:hover {
+  background-color: #1d4ed8;
+}
+
+.metadata-field {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.metadata-key-input,
+.metadata-value-input {
+  background-color: #1a1a1a;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: #e4e4e4;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.metadata-key-input {
+  flex: 0 0 150px;
+}
+
+.metadata-value-input {
+  flex: 1;
+}
+
+.metadata-key-input:focus,
+.metadata-value-input:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+
+.remove-metadata-button {
+  background-color: #3a3a3a;
+  color: #dc2626;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: bold;
+  line-height: 1;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.remove-metadata-button:hover {
+  background-color: #dc2626;
+  color: white;
+}
