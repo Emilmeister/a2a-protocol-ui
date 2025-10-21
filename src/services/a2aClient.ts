@@ -86,7 +86,7 @@ export class A2AClient {
     console.log('🔵 A2A Streaming Request:', JSON.stringify(request, null, 2));
 
     try {
-      const response = await fetch('http://localhost:3001/api/proxy/stream', {
+      const response = await fetch(PROXY_URL + '/stream', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
