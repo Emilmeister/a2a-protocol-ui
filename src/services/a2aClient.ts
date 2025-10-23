@@ -86,138 +86,165 @@ export class A2AClient {
     console.log('🔵 A2A Streaming Request:', JSON.stringify(request, null, 2));
 
     try {
-      const response = await fetch(PROXY_URL + '/stream', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          url: this.url,
-          body: request,
-        }),
-      });
+      // Retry logic: 5 attempts with 5 second delay
+      const maxRetries = 5;
+      const retryDelay = 5000; // 5 seconds
+      let lastError: Error | null = null;
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          console.log(`🔄 Stream request attempt ${attempt}/${maxRetries}`);
 
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
+          const response = await fetch(PROXY_URL + '/stream', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              url: this.url,
+              body: request,
+            }),
+          });
 
-      if (!reader) {
-        throw new Error('No reader available');
-      }
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
 
-      let finalText = '';
-      let taskContext: TaskContext = context || { taskId: '', contextId: '' };
+          // Success - break out of retry loop and continue with stream processing
+          console.log(`✅ Stream request successful on attempt ${attempt}`);
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+          const reader = response.body?.getReader();
+          const decoder = new TextDecoder();
 
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
+          if (!reader) {
+            throw new Error('No reader available');
+          }
 
-        for (const line of lines) {
-          if (!line.trim() || !line.startsWith('data: ')) continue;
+          let finalText = '';
+          let taskContext: TaskContext = context || { taskId: '', contextId: '' };
 
-          const data = line.slice(6); // Remove 'data: ' prefix
-          if (data === '[DONE]') continue;
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
 
-          try {
-            const parsed = JSON.parse(data);
-            console.log('🟢 Stream chunk:', parsed);
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n');
 
-            if (parsed.error) {
-              throw new Error(parsed.error.message);
-            }
+            for (const line of lines) {
+              if (!line.trim() || !line.startsWith('data: ')) continue;
 
-            const result = parsed.result;
+              const data = line.slice(6); // Remove 'data: ' prefix
+              if (data === '[DONE]') continue;
 
-            if (!result) continue;
+              try {
+                const parsed = JSON.parse(data);
+                console.log('🟢 Stream chunk:', parsed);
 
-            // Handle different response types based on 'kind'
-            if (result.kind === 'task') {
-              // Initial Task response
-              const terminalStates = ['completed', 'canceled', 'failed', 'rejected'];
-              const isTerminal = terminalStates.includes(result.status?.state);
-
-              taskContext = {
-                taskId: isTerminal ? '' : result.id,
-                contextId: result.contextId,
-              };
-
-              console.log(`📋 Task received: ${result.id}, state: ${result.status?.state}`);
-
-              // Extract message from status if available
-              if (result.status?.message?.role === 'agent') {
-                const textPart = result.status.message.parts?.find((p: any) => p.kind === 'text');
-                if (textPart?.text) {
-                  finalText = textPart.text;
+                if (parsed.error) {
+                  throw new Error(parsed.error.message);
                 }
-              }
-            } else if (result.kind === 'message' && result.role === 'agent') {
-              // Intermediate streaming message from agent
-              const textPart = result.parts?.find((p: any) => p.kind === 'text');
-              if (textPart?.text) {
-                console.log('💬 Streaming message:', textPart.text.substring(0, 50));
-                if (onUpdate) {
-                  onUpdate(textPart.text);
-                }
-              }
 
-              // Update context
-              if (result.taskId) {
-                taskContext.taskId = result.taskId;
-              }
-              if (result.contextId) {
-                taskContext.contextId = result.contextId;
-              }
-            } else if (result.kind === 'status-update') {
-              // TaskStatusUpdateEvent - status changes during streaming
-              console.log(`📊 Status update: taskId=${result.taskId}, state=${result.status?.state}, final=${result.final}`);
+                const result = parsed.result;
 
-              taskContext.taskId = result.taskId;
-              taskContext.contextId = result.contextId;
+                if (!result) continue;
 
-              // Extract message from status (both intermediate and final)
-              if (result.status?.message?.role === 'agent') {
-                const textPart = result.status.message.parts?.find((p: any) => p.kind === 'text');
-                if (textPart?.text) {
-                  if (result.final) {
-                    // This is the final message
-                    finalText = textPart.text;
-                    console.log('✅ Final message received');
-                  } else {
-                    // This is an intermediate message - call onUpdate
-                    console.log('💬 Intermediate message:', textPart.text.substring(0, 50));
+                // Handle different response types based on 'kind'
+                if (result.kind === 'task') {
+                  // Initial Task response
+                  const terminalStates = ['completed', 'canceled', 'failed', 'rejected'];
+                  const isTerminal = terminalStates.includes(result.status?.state);
+
+                  taskContext = {
+                    taskId: isTerminal ? '' : result.id,
+                    contextId: result.contextId,
+                  };
+
+                  console.log(`📋 Task received: ${result.id}, state: ${result.status?.state}`);
+
+                  // Extract message from status if available
+                  if (result.status?.message?.role === 'agent') {
+                    const textPart = result.status.message.parts?.find((p: any) => p.kind === 'text');
+                    if (textPart?.text) {
+                      finalText = textPart.text;
+                    }
+                  }
+                } else if (result.kind === 'message' && result.role === 'agent') {
+                  // Intermediate streaming message from agent
+                  const textPart = result.parts?.find((p: any) => p.kind === 'text');
+                  if (textPart?.text) {
+                    console.log('💬 Streaming message:', textPart.text.substring(0, 50));
                     if (onUpdate) {
                       onUpdate(textPart.text);
                     }
                   }
-                }
-              }
 
-              // Clear taskId if terminal state
-              const terminalStates = ['completed', 'canceled', 'failed', 'rejected'];
-              if (terminalStates.includes(result.status?.state)) {
-                taskContext.taskId = '';
+                  // Update context
+                  if (result.taskId) {
+                    taskContext.taskId = result.taskId;
+                  }
+                  if (result.contextId) {
+                    taskContext.contextId = result.contextId;
+                  }
+                } else if (result.kind === 'status-update') {
+                  // TaskStatusUpdateEvent - status changes during streaming
+                  console.log(`📊 Status update: taskId=${result.taskId}, state=${result.status?.state}, final=${result.final}`);
+
+                  taskContext.taskId = result.taskId;
+                  taskContext.contextId = result.contextId;
+
+                  // Extract message from status (both intermediate and final)
+                  if (result.status?.message?.role === 'agent') {
+                    const textPart = result.status.message.parts?.find((p: any) => p.kind === 'text');
+                    if (textPart?.text) {
+                      if (result.final) {
+                        // This is the final message
+                        finalText = textPart.text;
+                        console.log('✅ Final message received');
+                      } else {
+                        // This is an intermediate message - call onUpdate
+                        console.log('💬 Intermediate message:', textPart.text.substring(0, 50));
+                        if (onUpdate) {
+                          onUpdate(textPart.text);
+                        }
+                      }
+                    }
+                  }
+
+                  // Clear taskId if terminal state
+                  const terminalStates = ['completed', 'canceled', 'failed', 'rejected'];
+                  if (terminalStates.includes(result.status?.state)) {
+                    taskContext.taskId = '';
+                  }
+                } else if (result.kind === 'artifact-update') {
+                  // TaskArtifactUpdateEvent - new artifacts generated
+                  console.log('🎨 Artifact update received');
+                  // Could handle artifacts here if needed
+                }
+              } catch (e) {
+                console.error('Failed to parse chunk:', e);
               }
-            } else if (result.kind === 'artifact-update') {
-              // TaskArtifactUpdateEvent - new artifacts generated
-              console.log('🎨 Artifact update received');
-              // Could handle artifacts here if needed
             }
-          } catch (e) {
-            console.error('Failed to parse chunk:', e);
+          }
+
+          return {
+            text: finalText,
+            context: taskContext,
+          };
+        } catch (error) {
+          lastError = error as Error;
+          console.error(`❌ Stream request attempt ${attempt} failed:`, error);
+
+          // If this wasn't the last attempt, wait before retrying
+          if (attempt < maxRetries) {
+            console.log(`⏳ Waiting ${retryDelay / 1000} seconds before retry...`);
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
           }
         }
       }
 
-      return {
-        text: finalText,
-        context: taskContext,
-      };
+      // If we get here, all retries failed
+      console.error(`❌ All ${maxRetries} stream request attempts failed`);
+      throw lastError || new Error('Stream request failed after all retries');
     } catch (error) {
       console.error('❌ Streaming request failed:', error);
       throw error;
